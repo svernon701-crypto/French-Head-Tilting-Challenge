@@ -103,607 +103,25 @@
             border: 4px solid var(--blue);
             position: relative;
             margin-bottom: 15px;
-            background: #000;
+            background: #222;
         }
         video {
-            display: none;
-        }
-        canvas {
+            position: absolute;
             width: 100%;
             height: 100%;
             object-fit: cover;
             transform: scaleX(-1);
+            opacity: 0; /* Keeps hidden stream element contained but running natively */
         }
-        #question-text {
-            font-size: 1.6rem;
-            font-weight: 600;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-        #timer {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--red);
-        }
-        .answer-card {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: white;
-            margin: 20px;
-            border-radius: 20px;
-            font-size: 1.8rem;
-            font-weight: bold;
-            text-align: center;
-            padding: 20px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            border: 4px solid transparent;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-        .answer-card .direction-label {
-            position: absolute;
-            font-size: 1rem;
-            background: #333;
-            color: white;
-            padding: 5px 10px;
-            border-radius: 10px;
-            top: -15px;
-            text-transform: uppercase;
-        }
-        .answer-up { grid-column: 2; grid-row: 1; align-self: end; }
-        .answer-down { grid-column: 2; grid-row: 3; align-self: start; }
-        .answer-left { grid-column: 1; grid-row: 2; justify-self: end; }
-        .answer-right { grid-column: 3; grid-row: 2; justify-self: start; }
-        
-        .highlight {
-            transform: scale(1.1);
-            border-color: var(--gold);
-            background: #fffdf0;
-            box-shadow: 0 0 20px var(--gold);
-        }
-        .correct-answer {
-            background: #4CAF50;
-            color: white;
-            border-color: #388E3C;
-            transform: scale(1.1);
-        }
-        .wrong-answer {
-            background: var(--red);
-            color: white;
-            border-color: #b71c1c;
-        }
-        .hud {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 1.5rem;
-            font-weight: bold;
-            background: white;
-            padding: 10px 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            z-index: 100;
-        }
-        #fact-overlay {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 85, 164, 0.95);
-            color: white;
-            padding: 20px 40px;
-            border-radius: 20px;
-            font-size: 1.4rem;
-            text-align: center;
-            display: none;
-            width: 80%;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            z-index: 100;
-        }
-        #loading-text {
-            color: var(--blue);
-            font-weight: bold;
-            margin-top: 15px;
-        }
-        .progress-bar {
-            width: 100%;
-            height: 10px;
-            background: #ddd;
-            border-radius: 5px;
-            margin-top: 10px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
-            width: 0%;
-            background: var(--gold);
-            transition: width 0.1s linear;
-        }
-    </style>
-</head>
-<body>
-
-    <div id="start-screen" class="screen active">
-        <h1>French Landmarks<br>Head-Tilt Challenge</h1>
-        <p>Test your knowledge of France! Move your head <strong>UP, DOWN, LEFT,</strong> or <strong>RIGHT</strong> to lock in your answers. Hold your pose for 1 second to confirm.</p>
-        <button onclick="initializeGame()">Start Game</button>
-        <p id="loading-text"></p>
-    </div>
-
-    <div id="game-ui" class="game-ui">
-        <div class="hud">Score: <span id="score">0</span> / 10</div>
-        
-        <div id="ans-up" class="answer-card answer-up"><span class="direction-label">Tilt Up</span><span class="text"></span></div>
-        <div id="ans-left" class="answer-card answer-left"><span class="direction-label">Tilt Left</span><span class="text"></span></div>
-        
-        <div class="center-stage">
-            <div id="webcam-container">
-                <video id="video" autoplay playsinline></video>
-                <canvas id="output_canvas"></canvas>
-            </div>
-            <div id="question-text">Loading question...</div>
-            <div id="timer">15</div>
-            <div class="progress-bar"><div id="hold-progress" class="progress-fill"></div></div>
-        </div>
-
-        <div id="ans-right" class="answer-card answer-right"><span class="direction-label">Tilt Right</span><span class="text"></span></div>
-        <div id="ans-down" class="answer-card answer-down"><span class="direction-label">Tilt Down</span><span class="text"></span></div>
-        
-        <div id="fact-overlay"></div>
-    </div>
-
-    <div id="end-screen" class="screen">
-        <h1>Magnifique!</h1>
-        <p>Your Final Score: <strong id="final-score">0</strong> out of 10</p>
-        <p id="rank-text"></p>
-        <button onclick="location.reload()">Play Again</button>
-    </div>
-
-    <script>
-        const questionsData = [
-            {
-                q: "This famous French landmark is known for its giant glass pyramid entrance.",
-                answers: { left: "Eiffel Tower", right: "Louvre Museum", up: "Palace of Versailles", down: "Big Ben" },
-                correct: "right",
-                fact: "The Louvre is so large it would take 100 days to see every artwork for 30 seconds each!"
-            },
-            {
-                q: "This tower sparkles at night and is the ultimate symbol of Paris.",
-                answers: { left: "Eiffel Tower", right: "Arc de Triomphe", up: "Pont du Gard", down: "Mont Saint-Michel" },
-                correct: "left",
-                fact: "The Eiffel Tower grows up to 15 centimeters taller in the summer due to thermal expansion."
-            },
-            {
-                q: "This massive arch stands on the Champs-Élysées and honors French soldiers.",
-                answers: { left: "Panthéon", right: "Notre-Dame", up: "Arc de Triomphe", down: "London Bridge" },
-                correct: "up",
-                fact: "A pilot famously flew his biplane through the center of the Arc de Triomphe in 1919."
-            },
-            {
-                q: "This magical medieval abbey looks like a castle floating on an island during high tide.",
-                answers: { left: "Louvre", right: "Mont Saint-Michel", up: "Versailles", down: "French Riviera" },
-                correct: "right",
-                fact: "The tides around Mont Saint-Michel are known to rush in as fast as a galloping horse."
-            },
-            {
-                q: "This massive royal palace features the world-famous glittering Hall of Mirrors.",
-                answers: { left: "Palace of Versailles", right: "Eiffel Tower", up: "Buckingham Palace", down: "Pont du Gard" },
-                correct: "left",
-                fact: "King Louis XIV loved orange blossoms so much he built an indoor orangery here just for his trees."
-            },
-            {
-                q: "This medieval cathedral has famous flying buttresses and gargoyles.",
-                answers: { left: "Sacré-Cœur", right: "Louvre", up: "Pont du Gard", down: "Notre-Dame de Paris" },
-                correct: "down",
-                fact: "The largest and heaviest bell inside Notre-Dame is affectionately named Emmanuel."
-            },
-            {
-                q: "This ancient Roman aqueduct bridge has three beautiful levels of arches in southern France.",
-                answers: { left: "Pont du Gard", right: "Arc de Triomphe", up: "Mont Saint-Michel", down: "Colosseum" },
-                correct: "left",
-                fact: "The Pont du Gard was built entirely without mortar, relying entirely on perfect geometric stone cutting."
-            },
-            {
-                q: "This famous glamourous coastline is home to beautiful beaches and the Cannes Film Festival.",
-                answers: { left: "Normandy", right: "French Riviera", up: "Brittany", down: "The Alps" },
-                correct: "right",
-                fact: "The French Riviera, also known as the Côte d'Azur, enjoys over 300 days of glorious sunshine every year."
-            },
-            {
-                q: "This underground maze holds the bones of more than six million people beneath Paris.",
-                answers: { left: "The Catacombs", right: "Panthéon", up: "Louvre Basement", down: "Versailles Tunnels" },
-                correct: "left",
-                fact: "The tunnel network is so vast that secret groups have built hidden cinemas inside them."
-            },
-            {
-                q: "This beautiful white basilica sits at the highest point of Paris in Montmartre.",
-                answers: { left: "Notre-Dame", right: "Arc de Triomphe", up: "Sacré-Cœur", down: "Pont du Gard" },
-                correct: "up",
-                fact: "The special stones of Sacré-Cœur secrete a white substance when it rains, keeping the building bright white."
-            }
-        ];
-
-        let questions = [];
-        let currentQuestionIndex = 0;
-        let score = 0;
-        let gameActive = false;
-        let answerLocked = false;
-        let timeLeft = 15;
-        let timerInterval;
-        
-        let currentTilt = null;
-        let tiltHoldFrames = 0;
-        const FRAMES_TO_LOCK = 20;
-
-        const videoElement = document.getElementById('video');
-        const canvasElement = document.getElementById('output_canvas');
-        const canvasCtx = canvasElement.getContext('2d');
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-        function playSound(type) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            if (type === 'tick') {
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.05);
-            } else if (type === 'lock') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
-                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.2);
-            } else if (type === 'correct') {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
-                osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); 
-                osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); 
-                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.4);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.4);
-            } else if (type === 'wrong') {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-                osc.frequency.linearRampToValueAtTime(100, audioCtx.currentTime + 0.3);
-                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.3);
-            }
-        }
-
-        function detectTilt(landmarks) {
-            const leftEye = landmarks[33];
-            const rightEye = landmarks[263];
-            const nose = landmarks[1];
-            const chin = landmarks[152];
-            const forehead = landmarks[10];
-
-            const dx = rightEye.x - leftEye.x;
-            const dy = rightEye.y - leftEye.y;
-            const rollAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-            if (rollAngle > 12) return 'left';
-            if (rollAngle < -12) return 'right';
-
-            const noseToChin = Math.hypot(nose.x - chin.x, nose.y - chin.y);
-            const noseToForehead = Math.hypot(nose.x - forehead.x, nose.y - forehead.y);
-            const pitchRatio = noseToChin / noseToForehead;
-
-            if (pitchRatio > 1.35) return 'up';
-            if (pitchRatio < 0.85) return 'down';
-
-            return 'center';
-        }
-
-        function onResults(results) {
-            canvasCtx.save();
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-            
-            if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-                const landmarks = results.multiFaceLandmarks[0];
-                
-                canvasCtx.fillStyle = 'var(--gold)';
-                const nose = landmarks[1];
-                canvasCtx.beginPath();
-                canvasCtx.arc(nose.x * canvasElement.width, nose.y * canvasElement.height, 5, 0, 2 * Math.PI);
-                canvasCtx.fill();
-
-                if (gameActive && !answerLocked) {
-                    const tilt = detectTilt(landmarks);
-                    handleTilt(tilt);
-                }
-            }
-            canvasCtx.restore();
-        }
-
-        function handleTilt(direction) {
-            document.querySelectorAll('.answer-card').forEach(el => el.classList.remove('highlight'));
-            
-            if (direction !== 'center') {
-                document.getElementById(`ans-${direction}`).classList.add('highlight');
-                if (currentTilt === direction) {
-                    tiltHoldFrames++;
-                } else {
-                    currentTilt = direction;
-                    tiltHoldFrames = 1;
-                }
-                
-                let progress = (tiltHoldFrames / FRAMES_TO_LOCK) * 100;
-                document.getElementById('hold-progress').style.width = `${Math.min(progress, 100)}%`;
-                playSound('tick');
-
-                if (tiltHoldFrames >= FRAMES_TO_LOCK) {
-                    lockAnswer(direction);
-                }
-            } else {
-                currentTilt = null;
-                tiltHoldFrames = 0;
-                document.getElementById('hold-progress').style.width = '0%';
-            }
-        }
-
-        function lockAnswer(direction) {
-            answerLocked = true;
-            clearInterval(timerInterval);
-            playSound('lock');
-            
-            const q = questions[currentQuestionIndex];
-            const isCorrect = (direction === q.correct);
-            const selectedElement = document.getElementById(`ans-${direction}`);
-            const correctElement = document.getElementById(`ans-${q.correct}`);
-
-            if (isCorrect) {
-                selectedElement.classList.add('correct-answer');
-                score++;
-                document.getElementById('score').innerText = score;
-                setTimeout(() => playSound('correct'), 200);
-            } else {
-                selectedElement.classList.add('wrong-answer');
-                correctElement.classList.add('correct-answer');
-                setTimeout(() => playSound('wrong'), 200);
-            }
-
-            const factOverlay = document.getElementById('fact-overlay');
-            factOverlay.innerText = isCorrect ? `Correct! ${q.fact}` : `Wrong! ${q.fact}`;
-            factOverlay.style.display = 'block';
-
-            setTimeout(() => {
-                currentQuestionIndex++;
-                if (currentQuestionIndex < questions.length) {
-                    loadQuestion();
-                } else {
-                    endGame();
-                }
-            }, 5000);
-        }
-
-        function startTimer() {
-            timeLeft = 15;
-            document.getElementById('timer').innerText = timeLeft;
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer').innerText = timeLeft;
-                if (timeLeft <= 0) {
-                    lockAnswer('timeout'); 
-                }
-            }, 1000);
-        }
-
-        function loadQuestion() {
-            answerLocked = false;
-            currentTilt = null;
-            tiltHoldFrames = 0;
-            document.getElementById('hold-progress').style.width = '0%';
-            document.getElementById('fact-overlay').style.display = 'none';
-            document.querySelectorAll('.answer-card').forEach(el => {
-                el.classList.remove('highlight', 'correct-answer', 'wrong-answer');
-            });
-
-            const q = questions[currentQuestionIndex];
-            document.getElementById('question-text').innerText = `Q${currentQuestionIndex + 1}: ${q.q}`;
-            document.querySelector('#ans-up .text').innerText = q.answers.up;
-            document.querySelector('#ans-down .text').innerText = q.answers.down;
-            document.querySelector('#ans-left .text').innerText = q.answers.left;
-            document.querySelector('#ans-right .text').innerText = q.answers.right;
-
-            startTimer();
-        }
-
-        function shuffle(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
-        }
-
-        async function initializeGame() {
-            document.getElementById('loading-text').innerText = "Requesting webcam access and loading AI models...";
-            
-            try {
-                if(audioCtx.state === 'suspended') audioCtx.resume();
-                questions = shuffle([...questionsData]);
-                
-                const faceMesh = new FaceMesh({locateFile: (file) => {
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
-                }});
-                
-                faceMesh.setOptions({
-                    maxNumFaces: 1,
-                    refineLandmarks: true,
-                    minDetectionConfidence: 0.5,
-                    minTrackingConfidence: 0.5
-                });
-                
-                faceMesh.onResults(onResults);
-
-                const camera = new Camera(videoElement, {
-                    onFrame: async () => {
-                        await faceMesh.send({image: videoElement});
-                    },
-                    width: 480,
-                    height: 360
-                });
-                
-                await camera.start();
-                
-                document.getElementById('start-screen').classList.remove('active');
-                document.getElementById('game-ui').classList.add('active');
-                gameActive = true;
-                loadQuestion();
-
-            } catch (error) {
-                document.getElementById('loading-text').innerText = "Error accessing webcam. Please ensure permissions are granted.";
-                console.error(error);
-            }
-        }
-
-        function endGame() {
-            gameActive = false;
-            document.getElementById('game-ui').classList.remove('active');
-            document.getElementById('end-screen').classList.add('active');
-            document.getElementById('final-score').innerText = score;
-
-            let rank = "";
-            if (score >= 8) rank = "Certified French Tour Guide! Fantastique!";
-            else if (score >= 5) rank = "Solid Tourist! Keep exploring!";
-            else rank = "Lost in the countryside! Time to study up!";
-            document.getElementById('rank-text').innerText = rank;
-
-            if (score >= 5) {
-                confetti({
-                    particleCount: 150,
-                    spread: 70,
-                    origin: { y: 0.6 },
-                    colors: ['#0055A4', '#FFFFFF', '<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>French Landmarks Head-Tilt Challenge</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <style>
-        :root {
-            --blue: #0055A4;
-            --white: #FFFFFF;
-            --red: #EF4135;
-            --gold: #FFD700;
-        }
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, var(--blue), var(--white), var(--red));
-            overflow: hidden;
-            color: #333;
-            user-select: none;
-        }
-        .screen {
+        canvas {
             position: absolute;
             top: 0;
             left: 0;
-            width: 100vw;
-            height: 100vh;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(5px);
-            z-index: 10;
-        }
-        .screen.active {
-            display: flex;
-        }
-        h1 {
-            font-size: 3.5rem;
-            color: var(--blue);
-            text-align: center;
-            text-shadow: 2px 2px 0px var(--white), 4px 4px 0px var(--red);
-            margin-bottom: 10px;
-        }
-        p {
-            font-size: 1.5rem;
-            text-align: center;
-            max-width: 800px;
-        }
-        button {
-            padding: 15px 40px;
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: white;
-            background: var(--red);
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            transition: transform 0.2s, background 0.2s;
-            margin-top: 20px;
-        }
-        button:hover {
-            transform: scale(1.05);
-            background: #d63025;
-        }
-        .game-ui {
-            display: none;
-            grid-template-columns: 1fr 1.5fr 1fr;
-            grid-template-rows: 1fr 1.5fr 1fr;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(255,255,255,0.7);
-        }
-        .game-ui.active {
-            display: grid;
-        }
-        .center-stage {
-            grid-column: 2;
-            grid-row: 2;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            padding: 20px;
-            position: relative;
-            z-index: 5;
-        }
-        #webcam-container {
-            width: 240px;
-            height: 180px;
-            border-radius: 15px;
-            overflow: hidden;
-            border: 4px solid var(--blue);
-            position: relative;
-            margin-bottom: 15px;
-            background: #000;
-        }
-        video {
-            display: none;
-        }
-        canvas {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1);
+            transform: scaleX(-1); /* Corrects webcam mirroring for easy viewing */
+            z-index: 2;
         }
         #question-text {
             font-size: 1.6rem;
@@ -925,7 +343,6 @@
         
         let currentTilt = null;
         let tiltHoldFrames = 0;
-        // Increased frame count requirement to slow down locking and prevent accidental triggers
         const FRAMES_TO_LOCK = 35; 
 
         const videoElement = document.getElementById('video');
@@ -986,7 +403,6 @@
             const dy = rightEye.y - leftEye.y;
             const rollAngle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-            // Widen constraints from 12 to 20 degrees for a less sensitive left/right detection
             if (rollAngle > 20) return 'left';
             if (rollAngle < -20) return 'right';
 
@@ -994,7 +410,6 @@
             const noseToForehead = Math.hypot(nose.x - forehead.x, nose.y - forehead.y);
             const pitchRatio = noseToChin / noseToForehead;
 
-            // Expanded resting ratio limits to create a safer neutral zone for pitch adjustments
             if (pitchRatio > 1.50) return 'up';
             if (pitchRatio < 0.70) return 'down';
 
@@ -1002,6 +417,7 @@
         }
 
         function onResults(results) {
+            // Force drawing frames to make sure canvas visual elements load continuously
             canvasCtx.save();
             canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
@@ -1012,7 +428,7 @@
                 canvasCtx.fillStyle = 'var(--gold)';
                 const nose = landmarks[1];
                 canvasCtx.beginPath();
-                canvasCtx.arc(nose.x * canvasElement.width, nose.y * canvasElement.height, 5, 0, 2 * Math.PI);
+                canvasCtx.arc(nose.x * canvasElement.width, nose.y * canvasElement.height, 6, 0, 2 * Math.PI);
                 canvasCtx.fill();
 
                 if (gameActive && !answerLocked) {
@@ -1038,7 +454,6 @@
                 let progress = (tiltHoldFrames / FRAMES_TO_LOCK) * 100;
                 document.getElementById('hold-progress').style.width = `${Math.min(progress, 100)}%`;
                 
-                // Only sound the tracking ticker every 3 frames to avoid loud audio clutter
                 if (tiltHoldFrames % 3 === 0) {
                     playSound('tick');
                 }
@@ -1131,9 +546,9 @@
 
         async function initializeGame() {
             document.getElementById('loading-text').innerText = "Requesting webcam access and loading AI models...";
+            if(audioCtx.state === 'suspended') audioCtx.resume();
             
             try {
-                if(audioCtx.state === 'suspended') audioCtx.resume();
                 questions = shuffle([...questionsData]);
                 
                 const faceMesh = new FaceMesh({locateFile: (file) => {
@@ -1149,13 +564,17 @@
                 
                 faceMesh.onResults(onResults);
 
+                // Set up the internal canvas dimensions match tracking boundaries
                 const camera = new Camera(videoElement, {
                     onFrame: async () => {
                         await faceMesh.send({image: videoElement});
                     },
-                    width: 480,
-                    height: 360
+                    width: 640,
+                    height: 480
                 });
+                
+                canvasElement.width = 640;
+                canvasElement.height = 480;
                 
                 await camera.start();
                 
@@ -1165,7 +584,8 @@
                 loadQuestion();
 
             } catch (error) {
-                document.getElementById('loading-text').innerText = "Error accessing webcam. Please ensure permissions are granted.";
+                document.getElementById('loading-text').innerText = "Camera setup failed. Check your browser camera permissions or close other apps using the webcam.";
+                alert("Webcam access error: Please make sure your camera is plugged in and permissions are set to 'Allow'.");
                 console.error(error);
             }
         }
@@ -1188,12 +608,6 @@
                     spread: 70,
                     origin: { y: 0.6 },
                     colors: ['#0055A4', '#FFFFFF', '#EF4135']
-                });
-            }
-        }
-    </script>
-</body>
-</html>#EF4135']
                 });
             }
         }
